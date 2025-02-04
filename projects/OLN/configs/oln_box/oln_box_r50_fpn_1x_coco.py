@@ -1,3 +1,5 @@
+# from projects.OLN.oln.coco_split import CocoSplitDataset
+
 _base_ = [
     'mmdet::_base_/models/faster-rcnn_r50_fpn.py',
     'mmdet::_base_/datasets/coco_detection.py',
@@ -9,12 +11,6 @@ custom_imports = dict(
 
 model = dict(
     type='FasterRCNN',
-    data_preprocessor=dict(
-        type='DetDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
-        bgr_to_rgb=True,
-        pad_size_divisor=32),
     rpn_head=dict(
         type='OLNRPNHead',
         anchor_generator=dict(
@@ -27,31 +23,21 @@ model = dict(
             normalizer=1.0),
         loss_cls=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.0),
+        reg_decoded_bbox=True,
         loss_bbox=dict(type='IoULoss', loss_weight=10.0),
         objectness_type='Centerness',
         loss_objectness=dict(type='L1Loss', loss_weight=1.0),
     ),
     roi_head=dict(
-        type='StandardRoIHead',
-        bbox_roi_extractor=dict(
-            type='SingleRoIExtractor',
-            roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
-            out_channels=256,
-            featmap_strides=[4, 8, 16, 32]),
+        type='OLNRoIHead',
         bbox_head=dict(
-            type='Shared2FCBBoxHead',
-            in_channels=256,
-            fc_out_channels=1024,
-            roi_feat_size=7,
-            num_classes=80,
-            bbox_coder=dict(
-                type='DeltaXYWHBBoxCoder',
-                target_means=[0., 0., 0., 0.],
-                target_stds=[0.1, 0.1, 0.2, 0.2]),
-            reg_class_agnostic=False,
+            type='Shared2FCBBoxScoreHead',
+            num_classes=1,
             loss_cls=dict(
-                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type='L1Loss', loss_weight=1.0))),
+                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.0),
+            loss_bbox=dict(type='L1Loss', loss_weight=1.0),
+            bbox_score_type='BoxIoU',  # 'BoxIoU' or 'Centerness'
+            loss_bbox_score=dict(type='L1Loss', loss_weight=1.0))),
     # model training and testing settings
     train_cfg=dict(
         rpn=dict(
@@ -70,36 +56,61 @@ model = dict(
                 add_gt_as_proposals=False)
         ),
         rpn_proposal=dict(
+            nms_across_levels=False,
             nms_pre=2000,
-            max_per_img=1000,
-            nms=dict(type='nms', iou_threshold=0.7),
-            min_bbox_size=0),
-        rcnn=dict(
-            assigner=dict(
-                type='MaxIoUAssigner',
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
-                min_pos_iou=0.5,
-                match_low_quality=False,
-                ignore_iof_thr=-1),
-            sampler=dict(
-                type='RandomSampler',
-                num=512,
-                pos_fraction=0.25,
-                neg_pos_ub=-1,
-                add_gt_as_proposals=True),
-            pos_weight=-1,
-            debug=False)),
+            nms_post=2000,
+            max_num=2000,
+            nms_thr=0.7,
+            min_bbox_size=0)),
     test_cfg=dict(
         rpn=dict(
-            nms_pre=1000,
-            max_per_img=1000,
-            nms=dict(type='nms', iou_threshold=0.7),
+            nms_across_levels=False,
+            nms_pre=2000,
+            nms_post=2000,
+            max_num=2000,
+            nms_thr=0.0,  # No nms
             min_bbox_size=0),
         rcnn=dict(
-            score_thr=0.05,
-            nms=dict(type='nms', iou_threshold=0.5),
-            max_per_img=100)
+            score_thr=0.00,
+            nms=dict(type='nms', iou_threshold=0.7),
+            max_per_img=1500)
         # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ))
+
+dataset_type = 'CocoSplitDataset'
+train_dataloader = dict(
+    batch_size=5,
+    dataset=dict(
+        type=dataset_type,
+        is_class_agnostic=True,
+        train_class='voc',
+        eval_class='nonvoc'))
+val_dataloader = dict(
+    dataset=dict(
+        type=dataset_type,
+        is_class_agnostic=True,
+        train_class='voc',
+        eval_class='nonvoc'))
+test_dataloader = val_dataloader
+
+train_cfg = dict(max_epochs=8)
+
+# learning rate
+param_scheduler = [
+    dict(
+        type='LinearLR', start_factor=0.02, by_epoch=False, begin=0, end=500),
+    dict(
+        type='MultiStepLR',
+        begin=0,
+        end=8,
+        by_epoch=True,
+        milestones=[6, 7],
+        gamma=0.1)
+]
+# optimizer
+optim_wrapper = dict(
+    type='OptimWrapper',
+    optimizer=dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0001))
+default_hooks = dict(
+    checkpoint=dict(type='CheckpointHook', interval=2))

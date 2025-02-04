@@ -9,21 +9,18 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from mmengine.config import ConfigDict
+from mmengine.structures import InstanceData
+
 from mmdet.models.task_modules.samplers import SamplingResult
-import torch as Tensor
-from mmcv.cnn import ConvModule
+from torch import Tensor
 
-from mmdet.models.utils import multi_apply
-from mmdet.models import multiclass_nms
+from mmdet.models.utils import multi_apply, empty_instances
+from mmdet.models import multiclass_nms, ConvFCBBoxHead
 from mmdet.registry import MODELS
-from mmdet.structures.bbox import bbox_overlaps
-# from mmdet.models.builder import HEADS, build_loss
+from mmdet.structures.bbox import bbox_overlaps, get_box_tensor, scale_boxes
 from mmdet.models.losses import accuracy
-
-from .bbox_head import BBoxHead
-from .convfc_bbox_head import ConvFCBBoxHead
+from mmdet.utils import InstanceList
 
 
 @MODELS.register_module()
@@ -44,6 +41,7 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
                  with_bbox_score=True, 
                  bbox_score_type='BoxIoU',
                  loss_bbox_score=dict(type='L1Loss', loss_weight=1.0),
+                 init_cfg=None,
                  **kwargs):
         super(ConvFCBBoxScoreHead, self).__init__(**kwargs)
         self.with_bbox_score = with_bbox_score
@@ -56,11 +54,10 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
         self.with_class_score = self.loss_cls.loss_weight > 0.0
         self.with_bbox_loc_score = self.loss_bbox_score.loss_weight > 0.0
 
-    def init_weights(self):
-        super(ConvFCBBoxScoreHead, self).init_weights()
-        if self.with_bbox_score:
-            nn.init.normal_(self.fc_bbox_score.weight, 0, 0.01)
-            nn.init.constant_(self.fc_bbox_score.bias, 0)
+        if init_cfg is None and self.with_bbox_score:
+            self.init_cfg += [
+                dict(type='Normal', layer='fc_bbox_score', std=0.01),
+            ]
 
     def forward(self, x):
         # shared part
@@ -81,6 +78,24 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
         x_reg = x
         x_bbox_score = x
 
+        for conv in self.cls_convs:
+            x_cls = conv(x_cls)
+        if x_cls.dim() > 2:
+            if self.with_avg_pool:
+                x_cls = self.avg_pool(x_cls)
+            x_cls = x_cls.flatten(1)
+        for fc in self.cls_fcs:
+            x_cls = self.relu(fc(x_cls))
+
+        for conv in self.reg_convs:
+            x_reg = conv(x_reg)
+        if x_reg.dim() > 2:
+            if self.with_avg_pool:
+                x_reg = self.avg_pool(x_reg)
+            x_reg = x_reg.flatten(1)
+        for fc in self.reg_fcs:
+            x_reg = self.relu(fc(x_reg))
+
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
         bbox_score = (self.fc_bbox_score(x_bbox_score)
@@ -100,9 +115,11 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
         labels = pos_priors.new_full((num_samples, ),
                                      self.num_classes,
                                      dtype=torch.long)
+        reg_dim = pos_gt_bboxes.size(-1) if self.reg_decoded_bbox \
+            else self.bbox_coder.encode_size
         label_weights = pos_priors.new_zeros(num_samples)
-        bbox_targets = pos_priors.new_zeros(num_samples, 4)
-        bbox_weights = pos_priors.new_zeros(num_samples, 4)
+        bbox_targets = pos_priors.new_zeros(num_samples, reg_dim)
+        bbox_weights = pos_priors.new_zeros(num_samples, reg_dim)
         bbox_score_targets = pos_priors.new_zeros(num_samples)
         bbox_score_weights = pos_priors.new_zeros(num_samples)
 
@@ -119,18 +136,18 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
                 # is applied directly on the decoded bounding boxes, both
                 # the predicted boxes and regression targets should be with
                 # absolute coordinate format.
-                pos_bbox_targets = pos_gt_bboxes
+                pos_bbox_targets = get_box_tensor(pos_gt_bboxes)
             bbox_targets[:num_pos, :] = pos_bbox_targets
             bbox_weights[:num_pos, :] = 1
             
             # Bbox-IoU as target
             if self.bbox_score_type == 'BoxIoU':
-                print('Using BoxIoU as target...')
+                # print('Using BoxIoU as target...')
                 pos_bbox_score_targets = bbox_overlaps(
                     pos_priors, pos_gt_bboxes, is_aligned=True)
             # Centerness as target
             elif self.bbox_score_type == 'Centerness':
-                print('Using Centerness as target...')
+                # print('Using Centerness as target...')
                 tblr_bbox_coder = MODELS.build(
                     dict(type='TBLRBBoxCoder', normalizer=1.0))
                 pos_center_bbox_targets = tblr_bbox_coder.encode(
@@ -184,14 +201,10 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
        # cls_reg_targets is only for cascade rcnn
         return dict(loss_bbox=losses, bbox_targets=cls_reg_targets)
 
-
-
-
     def get_targets(self,
                     sampling_results: List[SamplingResult],
                     rcnn_train_cfg: ConfigDict,
-                    concat: bool = True,
-                    class_agnostic=False): 
+                    concat: bool = True):
         pos_priors_list = [res.pos_priors for res in sampling_results]
         neg_priors_list = [res.neg_priors for res in sampling_results]
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
@@ -206,9 +219,7 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
             pos_gt_labels_list,
             cfg=rcnn_train_cfg)      
 
-        
         if concat:
-            print('Concatenating...')
             labels = torch.cat(labels, 0)
             label_weights = torch.cat(label_weights, 0)
             bbox_targets = torch.cat(bbox_targets, 0)
@@ -239,13 +250,21 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
             # print('cls_score:', cls_score)
             # print('labels:', labels)
             if cls_score.numel() > 0:
-                losses['loss_cls'] = self.loss_cls(
+                loss_cls_ = self.loss_cls(
                     cls_score,
                     labels,
                     label_weights,
                     avg_factor=avg_factor,
                     reduction_override=reduction_override)
-                losses['acc'] = accuracy(cls_score, labels)
+                if isinstance(loss_cls_, dict):
+                    losses.update(loss_cls_)
+                else:
+                    losses['loss_cls'] = loss_cls_
+                if self.custom_activation:
+                    acc_ = self.loss_cls.get_accuracy(cls_score, labels)
+                    losses.update(acc_)
+                else:
+                    losses['acc'] = accuracy(cls_score, labels)
         if bbox_pred is not None:
             bg_class_ind = self.num_classes
             # 0~self.num_classes-1 are FG, self.num_classes is BG
@@ -258,15 +277,15 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
                     # the decoded bounding boxes, it decodes the
                     # already encoded coordinates to absolute format.
                     bbox_pred = self.bbox_coder.decode(rois[:, 1:], bbox_pred)
+                    bbox_pred = get_box_tensor(bbox_pred)
                 if self.reg_class_agnostic:
                     pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
+                        bbox_pred.size(0), -1)[pos_inds.type(torch.bool)]
                 else:
                     pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), -1,
-                        4)[pos_inds.type(torch.bool),
-                           labels[pos_inds.type(torch.bool)]]
-
+                        bbox_pred.size(0), self.num_classes,
+                        -1)[pos_inds.type(torch.bool),
+                            labels[pos_inds.type(torch.bool)]]
                 losses['loss_bbox'] = self.loss_bbox(
                     pos_bbox_pred,
                     bbox_targets[pos_inds.type(torch.bool)],
@@ -286,57 +305,134 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
                     reduction_override=reduction_override)
         return losses
 
-    
-    def get_bboxes(self,
-                   rois,
+    def predict_by_feat(self,
+                        rois: Tuple[Tensor],
+                        cls_scores: Tuple[Tensor],
+                        bbox_preds: Tuple[Tensor],
+                        bbox_scores: Tuple[Tensor],
+                        rpn_scores: Tuple[Tensor],
+                        batch_img_metas: List[dict],
+                        rcnn_test_cfg: Optional[ConfigDict] = None,
+                        rescale: bool = False) -> InstanceList:
+        """Transform a batch of output features extracted from the head into
+        bbox results.
+
+        Args:
+            rois (tuple[Tensor]): Tuple of boxes to be transformed.
+                Each has shape  (num_boxes, 5). last dimension 5 arrange as
+                (batch_index, x1, y1, x2, y2).
+            cls_scores (tuple[Tensor]): Tuple of box scores, each has shape
+                (num_boxes, num_classes + 1).
+            bbox_preds (tuple[Tensor]): Tuple of box energies / deltas, each
+                has shape (num_boxes, num_classes * 4).
+            batch_img_metas (list[dict]): List of image information.
+            rcnn_test_cfg (obj:`ConfigDict`, optional): `test_cfg` of R-CNN.
+                Defaults to None.
+            rescale (bool): If True, return boxes in original image space.
+                Defaults to False.
+
+        Returns:
+            list[:obj:`InstanceData`]: Instance segmentation
+            results of each image after the post process.
+            Each item usually contains following keys.
+
+                - scores (Tensor): Classification scores, has a shape
+                  (num_instance, )
+                - labels (Tensor): Labels of bboxes, has a shape
+                  (num_instances, ).
+                - bboxes (Tensor): Has a shape (num_instances, 4),
+                  the last dimension 4 arrange as (x1, y1, x2, y2).
+        """
+        assert len(cls_scores) == len(bbox_preds)
+        result_list = []
+        for img_id in range(len(batch_img_metas)):
+            img_meta = batch_img_metas[img_id]
+            results = self._predict_by_feat_single(
+                roi=rois[img_id],
+                cls_score=cls_scores[img_id],
+                bbox_pred=bbox_preds[img_id],
+                bbox_score=bbox_scores[img_id],
+                rpn_score=rpn_scores[img_id],
+                img_meta=img_meta,
+                rescale=rescale,
+                rcnn_test_cfg=rcnn_test_cfg)
+            result_list.append(results)
+
+        return result_list
+
+    def _predict_by_feat_single(self,
+                   roi,
                    cls_score,
                    bbox_pred,
                    bbox_score,
                    rpn_score,
-                   img_shape,
-                   scale_factor,
+                   img_meta,
                    rescale=False,
-                   cfg=None):
-        if isinstance(cls_score, list):
-            cls_score = sum(cls_score) / float(len(cls_score))
+                   rcnn_test_cfg=None):
+        results = InstanceData()
+        if roi.shape[0] == 0:
+            return empty_instances([img_meta],
+                                   roi.device,
+                                   task_type='bbox',
+                                   instance_results=[results],
+                                   box_type=self.predict_box_type,
+                                   use_box_type=False,
+                                   num_classes=self.num_classes,
+                                   score_per_cls=rcnn_test_cfg is None)[0]
         # cls_score is not used.
         # scores = F.softmax(
         #     cls_score, dim=1) if cls_score is not None else None
-        
-        if bbox_pred is not None:
-            bboxes = self.bbox_coder.decode(
-                rois[:, 1:], bbox_pred, max_shape=img_shape)
-        else:
-            bboxes = rois[:, 1:].clone()
-            if img_shape is not None:
-                bboxes[:, [0, 2]].clamp_(min=0, max=img_shape[1])
-                bboxes[:, [1, 3]].clamp_(min=0, max=img_shape[0])
-
-        if rescale and bboxes.size(0) > 0:
-            if isinstance(scale_factor, float):
-                bboxes /= scale_factor
-            else:
-                scale_factor = bboxes.new_tensor(scale_factor)
-                bboxes = (bboxes.view(bboxes.size(0), -1, 4) /
-                          scale_factor).view(bboxes.size()[0], -1)
-
         # The objectness score of a region is computed as a geometric mean of
         # the estimated localization quality scores of OLN-RPN and OLN-Box
         # heads.
         scores = torch.sqrt(rpn_score * bbox_score.sigmoid())
 
+        img_shape = img_meta['img_shape']
+        num_rois = roi.size(0)
+        # bbox_pred would be None in some detector when with_reg is False,
+        # e.g. Grid R-CNN.
+        if bbox_pred is not None:
+            num_classes = 1 if self.reg_class_agnostic else self.num_classes
+            roi = roi.repeat_interleave(num_classes, dim=0)
+            bbox_pred = bbox_pred.view(-1, self.bbox_coder.encode_size)
+            bboxes = self.bbox_coder.decode(
+                roi[..., 1:], bbox_pred, max_shape=img_shape)
+        else:
+            bboxes = roi[:, 1:].clone()
+            if img_shape is not None and bboxes.size(-1) == 4:
+                bboxes[:, [0, 2]].clamp_(min=0, max=img_shape[1])
+                bboxes[:, [1, 3]].clamp_(min=0, max=img_shape[0])
+
+        if rescale and bboxes.size(0) > 0:
+            assert img_meta.get('scale_factor') is not None
+            scale_factor = [1 / s for s in img_meta['scale_factor']]
+            bboxes = scale_boxes(bboxes, scale_factor)
+
+        # Get the inside tensor when `bboxes` is a box type
+        bboxes = get_box_tensor(bboxes)
+        box_dim = bboxes.size(-1)
+        bboxes = bboxes.view(num_rois, -1)
+
         # Concat dummy zero-scores for the background class.
         scores = torch.cat([scores, torch.zeros_like(scores)], dim=-1)
 
-        if cfg is None:
-            return bboxes, scores
+        if rcnn_test_cfg is None:
+            # This means that it is aug test.
+            # It needs to return the raw results without nms.
+            results.bboxes = bboxes
+            results.scores = scores
         else:
-            det_bboxes, det_labels = multiclass_nms(bboxes, 
-                                                    scores,
-                                                    cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img)
-
-            return det_bboxes, det_labels
+            det_bboxes, det_labels = multiclass_nms(
+                bboxes,
+                scores,
+                rcnn_test_cfg.score_thr,
+                rcnn_test_cfg.nms,
+                rcnn_test_cfg.max_per_img,
+                box_dim=box_dim)
+            results.bboxes = det_bboxes[:, :-1]
+            results.scores = det_bboxes[:, -1]
+            results.labels = det_labels
+        return results
 
 
 @MODELS.register_module()

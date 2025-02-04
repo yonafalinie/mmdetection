@@ -75,6 +75,7 @@ class OLNRPNHead(RPNHead):
 
     def init_weights(self):
         """Initialize weights of the head."""
+        super().init_weights()
         normal_init(self.rpn_conv, std=0.01)
         normal_init(self.rpn_cls, std=0.01)
         normal_init(self.rpn_reg, std=0.01)

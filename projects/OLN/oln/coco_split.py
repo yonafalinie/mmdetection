@@ -5,29 +5,15 @@ Reference:
         Aug 2021. https://arxiv.org/abs/2108.06753
         Dahun Kim, Tsung-Yi Lin, Anelia Angelova, In So Kweon and Weicheng Kuo
 """
-
-import itertools
-import logging
 import os.path as osp
-import tempfile
-from collections import OrderedDict
-import os
+
 from typing import List, Union
 import copy
 
-import mmcv
-import numpy as np
-from mmengine.logging import print_log
-from .api_wrappers import COCO
 from mmengine.fileio import get_local_path
-# Added for cross-category evaluation
-# from .cocoeval_wrappers import COCOEvalWrapper, COCOEvalXclassWrapper
 
-from terminaltables import AsciiTable
-
-from mmdet.evaluation.functional import eval_recalls
 from mmdet.registry import DATASETS
-from .coco import CocoDataset
+from mmdet.datasets.coco import CocoDataset
 
 # try:
 #     import pycocotools
@@ -109,10 +95,11 @@ class CocoSplitDataset(CocoDataset):
             list[dict]: Annotation info from COCO api.
         """
 
-        self.coco = COCO(self.ann_file)
-        print(f"Loading annotations from '{self.coco}'")
+        with get_local_path(
+                self.ann_file, backend_args=self.backend_args) as local_path:
+            self.coco = self.COCOAPI(local_path)
 
-        self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
+        self.cat_ids = self.coco.get_cat_ids(cat_names=self.metainfo['classes'])
         self.train_cat_ids = self.coco.get_cat_ids(
             cat_names=self.class_names_dict[self.train_class]
             )
@@ -126,10 +113,10 @@ class CocoSplitDataset(CocoDataset):
                 cat_id: i for i, cat_id in enumerate(self.cat_ids)}
             
         self.cat_img_map = copy.deepcopy(self.coco.cat_img_map)
-        self.img_ids = self.coco.get_img_ids()
+        img_ids = self.coco.get_img_ids()
         data_list = []
         total_ann_ids = []
-        for img_id in self.img_ids:
+        for img_id in img_ids:
             raw_img_info = self.coco.load_imgs([img_id])[0]
             raw_img_info['img_id'] = img_id
 
@@ -154,41 +141,6 @@ class CocoSplitDataset(CocoDataset):
         # print(f"Returning data_list: {data_list}")
 
         return data_list
-
-    # # Refer to custom.py -- filter_img is not used in test_mode.
-    # def filter_data(self) -> List[dict]:
-    #     """Filter annotations according to filter_cfg.
-
-    #     Returns:
-    #         List[dict]: Filtered results.
-    #     """
-    #     if self.test_mode:
-    #         return self.data_list
-
-    #     if self.filter_cfg is None:
-    #         return self.data_list
-
-    #     filter_empty_gt = self.filter_cfg.get('filter_empty_gt', False)
-    #     min_size = self.filter_cfg.get('min_size', 0)
-
-    #     ids_with_ann = set(data_info['img_id'] for data_info in self.data_list)
-    #     ids_in_cat = set()
-    #     for class_id in self.cat_ids:
-    #         ids_in_cat |= set(self.coco.cat_img_map[class_id])
-
-    #     ids_in_cat &= ids_with_ann
-
-    #     valid_data_infos = []
-    #     for data_info in self.data_list:
-    #         img_id = data_info['img_id']
-    #         width = data_info['width']
-    #         height = data_info['height']
-    #         if filter_empty_gt and img_id not in ids_in_cat:
-    #             continue
-    #         if min(width, height) >= min_size:
-    #             valid_data_infos.append(data_info)
-
-    #     return valid_data_infos
 
     def parse_data_info(self, raw_data_info: dict) -> Union[dict, List[dict]]:
         """Parse raw annotation to target format.
@@ -242,7 +194,7 @@ class CocoSplitDataset(CocoDataset):
 
             if ann.get('iscrowd', False):
                 instance['ignore_flag'] = 1
-                instance['gt_bbox_ignore']=bbox
+                instance['gt_bbox_ignore'] = bbox
             else:
                 instance['ignore_flag'] = 0
             instance['bbox'] = bbox
@@ -253,5 +205,4 @@ class CocoSplitDataset(CocoDataset):
 
             instances.append(instance)
         data_info['instances'] = instances
-        # print(f"Returning data_info: {data_info}")
         return data_info
