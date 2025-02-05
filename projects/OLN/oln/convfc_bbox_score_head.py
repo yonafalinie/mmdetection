@@ -385,7 +385,7 @@ class ConvFCBBoxScoreHead(ConvFCBBoxHead):
         # The objectness score of a region is computed as a geometric mean of
         # the estimated localization quality scores of OLN-RPN and OLN-Box
         # heads.
-        scores = torch.sqrt(rpn_score * bbox_score.sigmoid())
+        scores = torch.sqrt(rpn_score.unsqueeze(-1) * bbox_score.sigmoid())
 
         img_shape = img_meta['img_shape']
         num_rois = roi.size(0)

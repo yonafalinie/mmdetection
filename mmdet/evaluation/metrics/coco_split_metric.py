@@ -114,8 +114,7 @@ class CocoSplitMetric(BaseMetric):
                  metric: Union[str, List[str]] = 'bbox',
                  classwise: bool = False,
                  train_class: str = 'voc',
-                 eval_class: str = 'nonvoc',  
-                 is_class_agnostic: bool = False,              
+                 eval_class: str = 'nonvoc',
                  proposal_nums: Sequence[int] = (100, 300, 1000),
                  iou_thrs: Optional[Union[float, Sequence[float]]] = None,
                  metric_items: Optional[Sequence[str]] = None,
@@ -128,15 +127,6 @@ class CocoSplitMetric(BaseMetric):
                  sort_categories: bool = False,
                  use_mp_eval: bool = False) -> None:
         super().__init__(collect_device=collect_device, prefix=prefix)
-
-
-
-
-
-
-
-
-
         # coco evaluation metrics
         self.metrics = metric if isinstance(metric, list) else [metric]
         allowed_metrics = ['bbox', 'segm', 'proposal', 'proposal_fast']
@@ -191,30 +181,16 @@ class CocoSplitMetric(BaseMetric):
                     self._coco_api.cats = sorted_cats
                     categories = self._coco_api.dataset['categories']
                     sorted_categories = sorted(
-                        categories, key=lambda i: i['itrain_cat_idsd'])
+                        categories, key=lambda i: i['id'])
                     self._coco_api.dataset['categories'] = sorted_categories
         else:
             self._coco_api = None
 
         # Mirror CocoSplitDataset initialization
-        self._coco_api = COCO(ann_file)
-        self.cat_ids = self._coco_api.get_cat_ids(cat_names=self.CLASSES)
         self.train_cat_ids = self._coco_api.get_cat_ids(
             cat_names=self.class_names_dict[train_class])
         self.eval_cat_ids = self._coco_api.get_cat_ids(
             cat_names=self.class_names_dict[eval_class])
-        
-        # Handle class-agnostic setting
-        self.is_class_agnostic = is_class_agnostic
-        if self.is_class_agnostic:
-            self.cat2label = {cat_id: 0 for cat_id in self.cat_ids}
-        else:
-            self.cat2label = {
-                cat_id: i for i, cat_id in enumerate(self.cat_ids)}
-
-
-
-
 
         # handle dataset lazy init
         self.cat_ids = None
@@ -497,7 +473,6 @@ class CocoSplitMetric(BaseMetric):
         result_files = self.results2json(preds, outfile_prefix)
 
         eval_results = OrderedDict()
-        cocoGt = self._coco_api
         if self.format_only:
             logger.info('results are saved in '
                         f'{osp.dirname(outfile_prefix)}')
@@ -541,19 +516,12 @@ class CocoSplitMetric(BaseMetric):
                     'The testing results of the whole dataset is empty.')
                 break
 
-            # Class manipulation.
-            for idx, annotations in enumerate(cocoGt.dataset['annotations']):
-                if annotations['category_id'] in self.eval_cat_ids:
-                    cocoGt.dataset['annotations'][idx]['ignored_split'] = 0
+                # Class manipulation.
+            for idx, ann in enumerate(self._coco_api.dataset['annotations']):
+                if ann['category_id'] in self.eval_cat_ids:
+                    self._coco_api.dataset['annotations'][idx]['ignored_split'] = 0
                 else:
-                    cocoGt.dataset['annotations'][idx]['ignored_split'] = 1
-
-
-
-
-
-
-
+                    self._coco_api.dataset['annotations'][idx]['ignored_split'] = 1
 
             if self.use_mp_eval:
                 coco_eval = COCOevalMP(self._coco_api, coco_dt, iou_type)
@@ -564,6 +532,7 @@ class CocoSplitMetric(BaseMetric):
             coco_eval.params.imgIds = self.img_ids
             coco_eval.params.maxDets = list(self.proposal_nums)
             coco_eval.params.iouThrs = self.iou_thrs
+            coco_eval.params.useCats = 0
 
             # mapping of cocoEval.stats
             coco_metric_names = {

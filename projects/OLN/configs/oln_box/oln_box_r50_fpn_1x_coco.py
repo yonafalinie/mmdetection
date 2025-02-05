@@ -87,6 +87,7 @@ train_dataloader = dict(
         train_class='voc',
         eval_class='nonvoc'))
 val_dataloader = dict(
+    batch_size=2,
     dataset=dict(
         type=dataset_type,
         is_class_agnostic=True,
@@ -95,6 +96,11 @@ val_dataloader = dict(
 test_dataloader = val_dataloader
 
 train_cfg = dict(max_epochs=8)
+
+val_evaluator = dict(
+    type='CocoSplitMetric',)
+test_evaluator = dict(
+    type='CocoSplitMetric',)
 
 # learning rate
 param_scheduler = [
