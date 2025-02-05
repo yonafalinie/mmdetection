@@ -115,7 +115,7 @@ class CocoSplitMetric(BaseMetric):
                  classwise: bool = False,
                  train_class: str = 'voc',
                  eval_class: str = 'nonvoc',
-                 proposal_nums: Sequence[int] = (100, 300, 1000),
+                 proposal_nums: Sequence[int] = (10, 20, 30, 50, 100, 300, 500, 1000, 1500),
                  iou_thrs: Optional[Union[float, Sequence[float]]] = None,
                  metric_items: Optional[Sequence[str]] = None,
                  format_only: bool = False,
