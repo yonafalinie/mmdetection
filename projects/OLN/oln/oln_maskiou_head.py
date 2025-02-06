@@ -69,6 +69,6 @@ class OLNMaskIoUHead(MaskIoUHead):
         for results, mask_iou_pred in zip(results_list, mask_iou_preds):
             labels = results.labels
             scores = results.scores
-            results.scores = torch.cbrt((scores ** 2) * mask_iou_pred[range(labels.size(0)),
-            labels])
+            results.scores = torch.pow((scores ** 2) * mask_iou_pred[range(labels.size(0)),
+            labels], 1/3)
         return results_list
