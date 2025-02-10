@@ -118,7 +118,7 @@ test_pipeline = [
 
 data_root = 'data/voc0712/'
 train_dataloader = dict(
-    batch_size=4,
+    batch_size=16,
     dataset=dict(
         type=dataset_type,
         is_class_agnostic=True,
