@@ -124,8 +124,9 @@ train_dataloader = dict(
         is_class_agnostic=True,
         train_class='all',
         eval_class='all',
-        ann_file=data_root + 'voc0712_train_all.json',
-        img_prefix=data_root + 'JPEGImages/',
+        data_root=data_root,
+        data_prefix=dict(img='JPEGImages/'),
+        ann_file='voc0712_train_all.json',
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=2,
@@ -135,8 +136,9 @@ val_dataloader = dict(
         train_class='all',
         eval_class='all',
         pipeline=test_pipeline,
-        ann_file=data_root + 'val_coco_format.json',
-        img_prefix=data_root + 'JPEGImages/'
+        data_root=data_root,
+        data_prefix=dict(img='JPEGImages/'),
+        ann_file='val_coco_format.json',
     ))
 test_dataloader = val_dataloader
 
