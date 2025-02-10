@@ -115,6 +115,8 @@ test_pipeline = [
         meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
                    'scale_factor'))
 ]
+
+data_root = 'data/voc0712/'
 train_dataloader = dict(
     batch_size=4,
     dataset=dict(
@@ -122,6 +124,8 @@ train_dataloader = dict(
         is_class_agnostic=True,
         train_class='all',
         eval_class='all',
+        ann_file=data_root + 'voc0712_train_all.json',
+        img_prefix=data_root + 'JPEGImages/',
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=2,
@@ -130,7 +134,10 @@ val_dataloader = dict(
         is_class_agnostic=True,
         train_class='all',
         eval_class='all',
-        pipeline=test_pipeline,))
+        pipeline=test_pipeline,
+        ann_file=data_root + 'val_coco_format.json',
+        img_prefix=data_root + 'JPEGImages/'
+    ))
 test_dataloader = val_dataloader
 
 train_cfg = dict(max_epochs=8)
