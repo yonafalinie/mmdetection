@@ -142,23 +142,26 @@ val_dataloader = dict(
     ))
 test_dataloader = val_dataloader
 
-train_cfg = dict(max_epochs=8)
+train_cfg = dict(max_epochs=18)
 
 val_evaluator = dict(
-    type='PseudoLabelCocoSplitMetric',)
-test_evaluator = dict(
-    type='PseudoLabelCocoSplitMetric',)
+    type='PseudoLabelCocoSplitMetric',
+    ann_file=data_root + 'val_coco_format.json',
+    train_class='all',
+    eval_class='all',
+)
+test_evaluator = val_evaluator
 
 # learning rate
 param_scheduler = [
     dict(
-        type='LinearLR', start_factor=0.02, by_epoch=False, begin=0, end=500),
+        type='LinearLR', start_factor=0.01, by_epoch=False, begin=0, end=500),
     dict(
         type='MultiStepLR',
         begin=0,
         end=8,
         by_epoch=True,
-        milestones=[6, 7],
+        milestones=[12, 16],
         gamma=0.1)
 ]
 # optimizer
