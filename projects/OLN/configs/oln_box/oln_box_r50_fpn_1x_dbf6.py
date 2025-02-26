@@ -6,50 +6,12 @@ _base_ = [
     'mmdet::_base_/schedules/schedule_1x.py', 'mmdet::_base_/default_runtime.py'
 ]
 
-norm_cfg = dict(type='LN2d', requires_grad=True)
-
-
 custom_imports = dict(
-    imports=['projects.OLN.oln',
-             'projects.OLN_DINOv2.backbones.dinov2_backbone',
-             'projects.DINOv2.backbones.dino_v2',
-             'projects.DINOv2.necks.simple_fpn',
-             'projects.DINOv2.hooks.fp16_compression_hook',
-             'projects.DINOv2.hooks.freeze_backbone_hook'],
+    imports=['projects.OLN.oln'],
                allow_failed_imports=False)
 
 model = dict(
     type='FasterRCNN',
-backbone=dict(
-        _delete_=True,
-        type='DINOv2',
-        img_size=518,
-        patch_size=14,
-        embed_dim=768,
-        depth=12,
-        num_heads=12,
-        drop_path_rate=0.1,
-        window_size=37,
-        mlp_ratio=4,
-        qkv_bias=True,
-        norm_cfg=dict(type='LN'),
-        window_block_indexes=[0, 1, 3, 4, 6, 7, 9,
-                              10],  # global attention for 2, 5, 8, 11
-        use_rel_pos=True,
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint='/home/neel/data/Code/MMOln-ssos/mmdetection/weights/vit-base-p14_'\
-                       'dinov2-pre_3rdparty_20230426-ba246503.pth'
-             )),
-    neck=dict(
-        _delete_=True,
-        type='SimpleFPN',
-        backbone_channel=768,
-        in_channels=[192, 384, 768, 768],
-        out_channels=256,
-        num_outs=5,
-        norm_cfg=norm_cfg,
-    ),
     rpn_head=dict(
         type='OLNRPNHead',
         anchor_generator=dict(
@@ -116,7 +78,6 @@ backbone=dict(
         # soft-nms is also supported for rcnn testing
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ))
-
 metainfo = dict(
     classes=('firearm', 'firearmpart', 'knife', 'camera', 'ceramic_knife', 'laptop'),  
 )
@@ -124,7 +85,7 @@ metainfo = dict(
 dataset_type = 'DBF6SplitDataset'
 data_root = '/media/neel/hdd8tb/dataset/dbf6/'
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=5,
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -147,17 +108,15 @@ val_dataloader = dict(
         eval_class='nonvoc'))
 test_dataloader = val_dataloader
 
+train_cfg = dict(max_epochs=8)
+
 val_evaluator = dict(
     type='CocoSplitMetric',
     ann_file=data_root + 'annotations/dbf6_test.json',)
 test_evaluator = dict(
     type='CocoSplitMetric',
     ann_file=data_root + 'annotations/dbf6_test.json',)
-
-train_cfg = dict(max_epochs=8)
-
-
-
+    
 # learning rate
 param_scheduler = [
     dict(
@@ -170,21 +129,9 @@ param_scheduler = [
         milestones=[6, 7],
         gamma=0.1)
 ]
-
 # optimizer
 optim_wrapper = dict(
     type='OptimWrapper',
-    optimizer=dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0001),
-    paramwise_cfg=dict(
-        custom_keys={
-            'backbone': dict(lr_mult=0.0, decay_mult=1.0)  # Fully freeze backbone
-        }
-    )
-)
-
-custom_hooks = [
-    dict(type='FreezeBackboneHook')
-]
-
+    optimizer=dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0001))
 default_hooks = dict(
     checkpoint=dict(type='CheckpointHook', interval=2))

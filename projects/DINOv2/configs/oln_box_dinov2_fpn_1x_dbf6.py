@@ -37,7 +37,7 @@ backbone=dict(
         use_rel_pos=True,
         init_cfg=dict(
             type='Pretrained',
-            checkpoint='/home3/qljx17/MMOln-ssos/mmdetection/weights/vit-base-p14_'\
+            checkpoint='/home/neel/data/Code/MMOln-ssos/mmdetection/weights/vit-base-p14_'\
                        'dinov2-pre_3rdparty_20230426-ba246503.pth'
              )),
     neck=dict(
@@ -124,7 +124,7 @@ metainfo = dict(
 )
 
 dataset_type = 'DBF6SplitDataset'
-data_root = '/home2/projects/datasets/dbf6/'
+data_root = '/media/neel/hdd8tb/dataset/dbf6/'
 train_dataloader = dict(
     batch_size=2,
     dataset=dict(
