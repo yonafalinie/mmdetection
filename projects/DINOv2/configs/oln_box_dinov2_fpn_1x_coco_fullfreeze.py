@@ -38,7 +38,7 @@ backbone=dict(
         use_rel_pos=True,
         init_cfg=dict(
             type='Pretrained',
-            checkpoint='/home3/qljx17/MMOln-ssos/mmdetection/weights/vit-base-p14_'\
+            checkpoint='/home/neel/data/Code/MMOln-ssos/mmdetection/weights/vit-base-p14_'\
                        'dinov2-pre_3rdparty_20230426-ba246503.pth'
              )),
     neck=dict(
@@ -117,46 +117,32 @@ backbone=dict(
         # e.g., nms=dict(type='soft_nms', iou_threshold=0.5, min_score=0.05)
     ))
 
-metainfo = dict(
-    classes=('firearm', 'firearmpart', 'knife', 'camera', 'ceramic_knife', 'laptop'),  
-)
 
-dataset_type = 'DBF6SplitDataset'
-data_root = '/home2/projects/datasets/dbf6/'
+
+
+dataset_type = 'CocoSplitDataset'
 train_dataloader = dict(
-    batch_size=2,
+    batch_size=8,
     dataset=dict(
         type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'annotations/dbf6_train__.json',
-        data_prefix=dict(img=data_root + 'images/'),
-        metainfo=metainfo,
         is_class_agnostic=True,
         train_class='voc',
         eval_class='nonvoc'))
 val_dataloader = dict(
-    batch_size=2,
+    batch_size=1,
     dataset=dict(
-        data_root=data_root,
-        ann_file=data_root + 'annotations/dbf6_test.json',
-        data_prefix=dict(img=data_root + 'images/'),
-        metainfo=metainfo,
         type=dataset_type,
         is_class_agnostic=True,
         train_class='voc',
         eval_class='nonvoc'))
 test_dataloader = val_dataloader
 
-val_evaluator = dict(
-    type='CocoSplitMetric',
-    ann_file=data_root + 'annotations/dbf6_test.json',)
-test_evaluator = dict(
-    type='CocoSplitMetric',
-    ann_file=data_root + 'annotations/dbf6_test.json',)
-
 train_cfg = dict(max_epochs=8)
 
-
+val_evaluator = dict(
+    type='CocoSplitMetric',)
+test_evaluator = dict(
+    type='CocoSplitMetric',)
 
 # learning rate
 param_scheduler = [
