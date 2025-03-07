@@ -637,6 +637,9 @@ class OLNRPNHead(RPNHead):
                 scores = objectness_score.softmax(-1)[:, :-1]
 
             scores = torch.squeeze(scores)
+            if scores.dim() == 0:  # Handle scalar case
+                scores = scores.unsqueeze(0)  # Convert to (1,)            
+            
             if 0 < nms_pre < scores.shape[0]:
                 # sort is faster than topk
                 # _, topk_inds = scores.topk(cfg.nms_pre)
