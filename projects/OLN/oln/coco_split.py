@@ -31,6 +31,7 @@ class CocoSplitDataset(CocoDataset):
 
     def __init__(self, 
                  is_class_agnostic=False, 
+                 dataset_name='coco',
                  train_class='all',
                  eval_class='all',
                  filter_empty_gt=True,
@@ -44,9 +45,48 @@ class CocoSplitDataset(CocoDataset):
         self.eval_class = eval_class
         self.filter_empty_gt = filter_empty_gt
         self.min_size = min_size
+
+        self.class_names_dict = self.get_class_splits(dataset_name)
+        if 'metainfo' not in kwargs and hasattr(self, 'CLASSES'):
+            kwargs['metainfo'] = dict(classes=self.CLASSES)        
         super(CocoSplitDataset, self).__init__(**kwargs)
-    
-    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+
+
+    def get_class_splits(self, dataset_name):
+        if dataset_name == 'coco':
+            classes = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+                       'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+                       'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+                       'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+                       'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+                       'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+                       'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+                       'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+                       'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+                       'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+                       'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+                       'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
+                       'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
+                       'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+            voc = ('airplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car',
+                   'cat', 'chair', 'cow', 'dining table', 'dog', 'horse',
+                   'motorcycle', 'person', 'potted plant', 'sheep', 'couch',
+                   'train', 'tv')
+            nonvoc = tuple([c for c in classes if c not in voc])
+        elif dataset_name == 'dbf6':
+            classes = ('firearm', 'firearmpart', 'knife', 'camera', 'ceramic_knife', 'laptop')
+            voc = ('knife', 'camera', 'ceramic_knife', 'laptop')
+            nonvoc = ('firearm', 'firearmpart')
+        elif dataset_name == 'sixray10':
+            classes = ('firearm', 'knife', 'wrench', 'pliers', 'scissors')
+            voc = ('knife', 'wrench', 'pliers', 'scissors')
+            nonvoc = ('firearm')            
+        elif dataset_name == 'ltdimaging':
+            classes = ('human', 'bicycle', 'motorcycle', 'vehicle')
+            voc = ('human', 'bicycle', 'motorcycle')
+            nonvoc = ('vehicle',)
+        elif dataset_name == 'bdd':
+            classes = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
@@ -60,30 +100,19 @@ class CocoSplitDataset(CocoDataset):
                'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
                'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
                'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
-    VOC_CLASSES = (
-               'airplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car',
-               'cat', 'chair', 'cow', 'dining table', 'dog', 'horse', 
-               'motorcycle', 'person', 'potted plant', 'sheep', 'couch',
-               'train', 'tv')
-    NONVOC_CLASSES = (
-               'truck', 'traffic light', 'fire hydrant',
-               'stop sign', 'parking meter', 'bench',
-               'elephant', 'bear', 'zebra', 'giraffe',
-               'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-               'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-               'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-               'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-               'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-               'hot dog', 'pizza', 'donut', 'cake',
-               'bed', 'toilet', 'laptop',
-               'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
-               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-               'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
-    class_names_dict = {
-        'all': CLASSES,
-        'voc': VOC_CLASSES,
-        'nonvoc': NONVOC_CLASSES
-    }
+            voc = ('person', 'bicycle', 'car', 'motorcycle', 'truck', 'bus', 'train', 'traffic light', 'stop sign')
+            nonvoc = tuple([c for c in classes if c not in voc])        
+        else:
+            raise ValueError(f"Unknown dataset_name: {dataset_name}")
+        
+        # Save for metainfo
+        self.CLASSES = classes
+        return {
+            'all': classes,
+            'voc': voc,
+            'nonvoc': nonvoc
+        }
+
 
     def load_data_list(self) -> List[dict]:
         """Load annotation from COCO style annotation file.
