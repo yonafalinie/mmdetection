@@ -11,9 +11,12 @@ from projects.OLN.oln import CocoSplitDataset
 @DATASETS.register_module()
 class PseudoLabelCocoSplitDataset(CocoSplitDataset):
 
-    def __init__(self, *args, **kwargs):
-        self.cat_pseudo_label_mapping = None
+    def __init__(self, cat_pseudo_label_mapping=None, *args, **kwargs):
+        self.cat_pseudo_label_mapping = cat_pseudo_label_mapping
+        if 'metainfo' not in kwargs and hasattr(self, 'CLASSES'):
+            kwargs['metainfo'] = dict(classes=self.CLASSES)
         super().__init__(*args, **kwargs)
+
 
     def load_data_list(self) -> List[dict]:
         """Load annotation from COCO style annotation file.
@@ -147,3 +150,36 @@ class PseudoLabelCocoSplitDataset(CocoSplitDataset):
             instances.append(instance)
         data_info['instances'] = instances
         return data_info
+    
+@DATASETS.register_module()
+class SSOSDB6SplitDataset(PseudoLabelCocoSplitDataset):
+    CLASSES = ('firearm', 'firearmpart', 'knife', 'camera', 'ceramic_knife', 'laptop')
+    ID_CLASSES = ('knife', 'camera', 'ceramic_knife', 'laptop')
+    OOD_CLASSES = ('firearm', 'firearmpart')
+    class_names_dict = {
+        'all': CLASSES,
+        'id': ID_CLASSES,
+        'ood': OOD_CLASSES
+    }    
+
+@DATASETS.register_module()
+class SSOSSIXRAY10SplitDataset(PseudoLabelCocoSplitDataset):
+    CLASSES = ('firearm', 'knife', 'wrench', 'pliers', 'scissors')
+    ID_CLASSES = ('knife', 'wrench', 'pliers', 'scissors')
+    OOD_CLASSES = ('firearm' )
+    class_names_dict = {
+        'all': CLASSES,
+        'id': ID_CLASSES,
+        'ood': OOD_CLASSES
+    }      
+
+@DATASETS.register_module()
+class SSOSLTDIMAGINGSplitDataset(PseudoLabelCocoSplitDataset):
+    CLASSES = ('human', 'bicycle', 'motorcycle', 'vehicle')
+    ID_CLASSES = ('human', 'bicycle', 'motorcycle')
+    OOD_CLASSES = ('vehicle' )
+    class_names_dict = {
+        'all': CLASSES,
+        'id': ID_CLASSES,
+        'ood': OOD_CLASSES
+    }    

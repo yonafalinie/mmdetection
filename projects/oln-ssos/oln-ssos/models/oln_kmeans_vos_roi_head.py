@@ -1,3 +1,4 @@
+from mmengine.logging import MMLogger
 import torch
 from sklearn.cluster import MiniBatchKMeans
 from torch import nn, Tensor
@@ -224,9 +225,30 @@ class OLNKMeansVOSRoIHead(OLNRoIHead):
         indices_numpy = selected_fg_samples.cpu().numpy().astype(int)
         gt_classes_numpy = bbox_targets[0].cpu().numpy().astype(int)
 
+        # logger = MMLogger.get_current_instance()
         gt_box_features = []
+        # Add debug logging
+        # logger.info(f"Number of bbox_results: {len(bbox_results)}")
+        # logger.info(f"Number of bbox_targets: {len(bbox_targets)}")
+        
+        selected_fg_samples = (bbox_targets[0] != self.k).nonzero().view(-1)
+        indices_numpy = selected_fg_samples.cpu().numpy().astype(int)
+        gt_classes_numpy = bbox_targets[0].cpu().numpy().astype(int)
+
+
+
+
         for index in indices_numpy:
             gt_box_features.append(bbox_results['shared_bbox_feats'][index].view(1, -1))
+        # Add safety check before concatenation
+        if len(gt_box_features) == 0:
+            # logger.warning("No ground truth box features found")
+            return {
+                'loss_ood': torch.tensor(0.0, device=device),
+                'loss_pseudo_class': torch.tensor(0.0, device=device)
+            }
+
+
         gt_box_features = torch.cat(gt_box_features, dim=0)
 
         ood_reg_loss = torch.zeros(1).to(device)
@@ -339,11 +361,12 @@ class OLNKMeansVOSRoIHead(OLNRoIHead):
                 current_iter += 1
         labels = []
         for iter_fts in self.post_epoch_features:
-            if iter_fts is None:
-                continue
-            print(f"iter_fts shape: {iter_fts.shape}, content: {iter_fts}")
+            if iter_fts is None or iter_fts.shape[0] == 0:
+                continue  # Skip empty feature arrays
             _labels = self.kmeans.predict(iter_fts.cpu())
             labels.append(torch.tensor(_labels).to(dev))
+        if len(labels) == 0:
+            return torch.empty(0, dtype=torch.long)
         labels = torch.cat(labels).cpu()
         self.means.data = torch.tensor(self.kmeans.cluster_centers_).to(dev)
         self.post_epoch_features = []

@@ -339,13 +339,16 @@ class PseudoLabelCocoSplitMetric(CocoSplitMetric):
 
                 if metric_items is None:
                     metric_items = [
-                        'mAP', 'mAP_50', 'mAP_75', 'mAP_s', 'mAP_m', 'mAP_l'
+                        'mAP', 'mAP_50', 'mAP_75', 'mAP_s', 'mAP_m', 'mAP_l',
+                        'AR@100', 'AR@300', 'AR@1000', 'AR_s@1000',
+                        'AR_m@1000', 'AR_l@1000'
                     ]
 
                 for metric_item in metric_items:
-                    key = f'{metric}_{metric_item}'
                     val = coco_eval.stats[coco_metric_names[metric_item]]
-                    eval_results[key] = float(f'{round(val, 3)}')
+                    key = f'coco/{metric}_{metric_item}'
+                    eval_results[key] = float(f'{val:.4f}')
+
 
                 ap = coco_eval.stats[:6]
                 logger.info(f'{metric}_mAP_copypaste: {ap[0]:.3f} '

@@ -117,7 +117,7 @@ test_pipeline = [
                    'scale_factor'))
 ]
 
-data_root = 'data/voc0712/'
+data_root = '/home2/projects/datasets/VOC/VOC_0712_converted/'
 train_dataloader = dict(
     batch_size=16,
     persistent_workers=False,
