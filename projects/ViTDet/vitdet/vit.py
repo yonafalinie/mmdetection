@@ -14,7 +14,7 @@ from mmdet.registry import MODELS
 
 
 @MODELS.register_module()
-class LN2d(nn.Module):
+class ViTDetLN2d(nn.Module):
     """A LayerNorm variant, popularized by Transformers, that performs
     pointwise mean and variance normalization over the channel dimension for
     inputs that have shape (batch_size, channels, height, width)."""
@@ -432,6 +432,9 @@ class ViT(BaseModule):
                 self.init_cfg.checkpoint, logger=logger, map_location='cpu')
             if 'model' in ckpt:
                 _state_dict = ckpt['model']
+            else:
+                _state_dict = ckpt
+                    
             self.load_state_dict(_state_dict, False)
 
     def forward(self, x):
