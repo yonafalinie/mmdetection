@@ -1,0 +1,28 @@
+* True check_forward_equal_with_pytorch_double: max_abs_err 8.67e-19 max_rel_err 2.35e-16
+* True check_forward_equal_with_pytorch_float: max_abs_err 4.66e-10 max_rel_err 1.13e-07
+* True check_gradient_numerical(D=30)
+* True check_gradient_numerical(D=32)
+* True check_gradient_numerical(D=64)
+* True check_gradient_numerical(D=71)
+* True check_gradient_numerical(D=1025)
+* True check_gradient_numerical(D=2048)
+Traceback (most recent call last):
+  File "/home3/qljx17/MMOln-ssos/mmdetection/projects/OLN_vitadapter/ops/test.py", line 109, in <module>
+    check_gradient_numerical(channels, True, True, True)
+  File "/home3/qljx17/MMOln-ssos/mmdetection/projects/OLN_vitadapter/ops/test.py", line 96, in check_gradient_numerical
+    gradok = gradcheck(
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1476, in gradcheck
+    return _gradcheck_helper(**args)
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1490, in _gradcheck_helper
+    _gradcheck_real_imag(gradcheck_fn, func, func_out, tupled_inputs, outputs, eps,
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1113, in _gradcheck_real_imag
+    gradcheck_fn(func, func_out, tupled_inputs, outputs, eps,
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 1166, in _slow_gradcheck
+    analytical = _check_analytical_jacobian_attributes(tupled_inputs, o, nondet_tol, check_grad_dtypes)
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 577, in _check_analytical_jacobian_attributes
+    jacobians2, _, _ = _stack_and_check_tensors(vjps2, inputs, output_numel)
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 517, in _stack_and_check_tensors
+    out_jacobians = _allocate_jacobians_with_inputs(inputs, numel_outputs)
+  File "/home3/qljx17/MMOln-ssos/evenv/lib/python3.9/site-packages/torch/autograd/gradcheck.py", line 45, in _allocate_jacobians_with_inputs
+    out.append(t.new_zeros((t.numel(), numel_output), layout=torch.strided))
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 17.14 GiB (GPU 0; 79.14 GiB total capacity; 68.87 GiB already allocated; 9.77 GiB free; 68.88 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
