@@ -24,7 +24,10 @@ from .semseg_metric import SemSegMetric
 from .voc_metric import VOCMetric
 from .youtube_vis_metric import YouTubeVISMetric
 from .coco_split_metric import CocoSplitMetric
-
+from .dbf6_split_metric import DBF6SplitMetric
+from .ltdimaging_split_metric import LTDIMAGINGSplitMetric
+from .sixray10_split_metric import SIXRAY10SplitMetric
+from .bdd_split_metric import BDDSplitMetric
 
 __all__ = [
     'CityScapesMetric', 'CocoMetric', 'CocoPanopticMetric', 'OpenImagesMetric',
@@ -33,5 +36,6 @@ __all__ = [
     'MOTChallengeMetric', 'CocoVideoMetric', 'ReIDMetrics', 'YouTubeVISMetric',
     'COCOCaptionMetric', 'SemSegMetric', 'RefSegMetric', 'RefExpMetric',
     'gRefCOCOMetric', 'DODCocoMetric', 'DumpODVGResults', 'Flickr30kMetric',
-    'OVCocoMetric', 'CocoSplitMetric'
+    'OVCocoMetric', 'CocoSplitMetric', 'DBF6SplitMetric', 'LTDIMAGINGSplitMetric' ,
+    'SIXRAY10SplitMetric' , 'BDDSplitMetric' ,
 ]
