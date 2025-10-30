@@ -11,7 +11,6 @@ norm_cfg = dict(type='LN2d', requires_grad=True)
 
 custom_imports = dict(
     imports=['projects.OLN.oln',
-             'projects.OLN_DINOv2.backbones.dinov2_backbone',
              'projects.DINOv2.backbones.dino_v2',
              'projects.DINOv2.necks.simple_fpn',
              'projects.DINOv2.hooks.fp16_compression_hook'],
@@ -118,31 +117,33 @@ backbone=dict(
 
 
 
-
 dataset_type = 'CocoSplitDataset'
+data_root = '/home2/projects/datasets/coco/'
 train_dataloader = dict(
-    batch_size=1,
+    batch_size=2,
     dataset=dict(
         type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'annotations/instances_train2017.json',
+        data_prefix=dict(img=data_root + 'train2017/'),
         is_class_agnostic=True,
+        dataset_name='coco',
         train_class='voc',
         eval_class='nonvoc'))
 val_dataloader = dict(
     batch_size=1,
     dataset=dict(
+        data_root=data_root,
+        ann_file=data_root + 'annotations/instances_val2017.json',
+        data_prefix=dict(img=data_root + 'val2017/'),
         type=dataset_type,
         is_class_agnostic=True,
+        dataset_name='coco',
         train_class='voc',
         eval_class='nonvoc'))
 test_dataloader = val_dataloader
 
 train_cfg = dict(max_epochs=8)
-
-val_evaluator = dict(
-    type='CocoSplitMetric',)
-test_evaluator = dict(
-    type='CocoSplitMetric',)
-
 # learning rate
 param_scheduler = [
     dict(
@@ -158,6 +159,6 @@ param_scheduler = [
 # optimizer
 optim_wrapper = dict(
     type='OptimWrapper',
-    optimizer=dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0001))
+    optimizer=dict(type='SGD', lr=0.0002, momentum=0.9, weight_decay=0.0001))
 default_hooks = dict(
     checkpoint=dict(type='CheckpointHook', interval=2))
