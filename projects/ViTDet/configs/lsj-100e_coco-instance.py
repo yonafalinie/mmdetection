@@ -4,7 +4,7 @@ _base_ = [
 
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = 'data/coco/'
+data_root = '/home2/projects/datasets/coco/'
 image_size = (1024, 1024)
 
 backend_args = None
@@ -41,7 +41,7 @@ test_pipeline = [
 ]
 
 train_dataloader = dict(
-    batch_size=4,
+    batch_size=1,
     num_workers=8,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
