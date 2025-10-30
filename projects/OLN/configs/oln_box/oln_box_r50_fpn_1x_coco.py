@@ -7,7 +7,8 @@ _base_ = [
 ]
 
 custom_imports = dict(
-    imports=['projects.OLN.oln'], allow_failed_imports=False)
+    imports=['projects.OLN.oln'],
+               allow_failed_imports=False)
 
 model = dict(
     type='FasterRCNN',
@@ -79,18 +80,27 @@ model = dict(
     ))
 
 dataset_type = 'CocoSplitDataset'
+data_root = '/home2/projects/datasets/coco/'
 train_dataloader = dict(
     batch_size=5,
     dataset=dict(
         type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'annotations/instances_train2017.json',
+        data_prefix=dict(img=data_root + 'train2017/'),
         is_class_agnostic=True,
+        dataset_name='coco',
         train_class='voc',
         eval_class='nonvoc'))
 val_dataloader = dict(
-    batch_size=2,
+    batch_size=1,
     dataset=dict(
+        data_root=data_root,
+        ann_file=data_root + 'annotations/instances_val2017.json',
+        data_prefix=dict(img=data_root + 'val2017/'),
         type=dataset_type,
         is_class_agnostic=True,
+        dataset_name='coco',
         train_class='voc',
         eval_class='nonvoc'))
 test_dataloader = val_dataloader
@@ -98,10 +108,13 @@ test_dataloader = val_dataloader
 train_cfg = dict(max_epochs=8)
 
 val_evaluator = dict(
-    type='CocoSplitMetric',)
+    type='CocoSplitMetric',
+    ann_file=data_root + 'annotations/instances_val2017.json',)
 test_evaluator = dict(
-    type='CocoSplitMetric',)
+    type='CocoSplitMetric',
+    ann_file=data_root + 'annotations/instances_val2017.json',)
 
+    
 # learning rate
 param_scheduler = [
     dict(
